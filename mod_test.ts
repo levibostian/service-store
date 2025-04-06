@@ -2,7 +2,11 @@ import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
 import { defineStore, StoreDefinition } from "./mod.ts";
 
 Deno.test("StoreBuilder ctor", () => {
-  assertThrows(() => new (StoreDefinition as any)(), Error, "Use the `defineStore` export instead.");
+  assertThrows(
+    () => new (StoreDefinition as any)(),
+    Error,
+    "Use the `defineStore` export instead.",
+  );
 });
 
 Deno.test("adding", () => {
@@ -31,6 +35,15 @@ Deno.test("adding", () => {
   b.a.value2;
 });
 
+Deno.test("key not in store", () => {
+  const store = defineStore().finalize();
+  assertThrows(
+    () => store.get("something" as never),
+    Error,
+    "Store did not contain key: something",
+  );
+});
+
 Deno.test("async", async () => {
   const store = defineStore()
     .add("A", () => {
@@ -56,7 +69,7 @@ Deno.test("dispose", () => {
       return {
         [Symbol.dispose]() {
           disposeCount++;
-        }
+        },
       };
     };
     using store = defineStore()
@@ -74,7 +87,7 @@ Deno.test("async dispose", async () => {
     return {
       [Symbol.dispose]() {
         disposeCount++;
-      }
+      },
     };
   };
   let asyncDisposeCount = 0;
@@ -83,7 +96,7 @@ Deno.test("async dispose", async () => {
       [Symbol.asyncDispose]() {
         asyncDisposeCount++;
         return Promise.resolve();
-      }
+      },
     };
   };
   {
@@ -96,7 +109,7 @@ Deno.test("async dispose", async () => {
         return {
           ...disposableFactory(),
           ...asyncDisposableFactory(),
-        }
+        };
       })
       .finalize();
     store.get("A");
@@ -108,18 +121,22 @@ Deno.test("async dispose", async () => {
 });
 
 Deno.test("async dispose used in using", () => {
-  assertThrows(() => {
-    using store = defineStore()
-      .add("A", () => {
-        return {
-          [Symbol.asyncDispose]() {
-            return Promise.resolve();
-          }
-        }
-      })
-      .finalize();
-    store.get("A");
-  }, Error, "Cannot dispose a container containing async disposables. Use `await using` instead of `using`.");
+  assertThrows(
+    () => {
+      using store = defineStore()
+        .add("A", () => {
+          return {
+            [Symbol.asyncDispose]() {
+              return Promise.resolve();
+            },
+          };
+        })
+        .finalize();
+      store.get("A");
+    },
+    Error,
+    "Cannot dispose a container containing async disposables. Use `await using` instead of `using`.",
+  );
 });
 
 Deno.test("transient", () => {
@@ -188,7 +205,7 @@ Deno.test("error", async () => {
   const store = defineStore()
     .add("a", async () => {
       i++;
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
       if (i === 1) {
         throw new Error("Error");
       }

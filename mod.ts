@@ -52,9 +52,6 @@ export class Store<
   get<TName extends keyof TFactories>(
     name: TName,
   ): ReturnType<TFactories[TName]> {
-    if (this.#parent?.has(name as any as never)) {
-      return this.#parent.get(name as any as never);
-    }
     if (name in this.#memoizedValues) {
       const entry = this.#memoizedValues[name]!;
       if (entry.promisify) {
@@ -64,6 +61,13 @@ export class Store<
       }
     } else {
       const factory = this.#factories[name];
+      if (factory == null) {
+        if (this.#parent?.has(name as any as never)) {
+          return this.#parent.get(name as any as never);
+        } else {
+          throw new Error(`Store did not contain key: ${name as any}`);
+        }
+      }
       const value = factory(this);
       if ((factory as any).transient) {
         return value as any;
@@ -74,7 +78,7 @@ export class Store<
             promisify: true,
             value,
           };
-        }).catch(_err => {
+        }).catch((_err) => {
           // remove the promise on error
           delete this.#memoizedValues[name];
         });

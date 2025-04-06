@@ -23,10 +23,10 @@ import { defineStore } from "@david/service-store";
 // services here will be shared amongst the requests
 const singletonStore = defineStore()
   .add("dbPool", async () => {
-    return /* ...create database pool here... */;
+    return; /* ...create database pool here... */
   })
   .add("imageCache", () => {
-    return /* ...create image cache here... */;
+    return; /* ...create image cache here... */
   })
   .finalize();
 
