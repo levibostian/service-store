@@ -44,6 +44,24 @@ Deno.test("key not in store", () => {
   );
 });
 
+Deno.test("service defined multiple times", () => {
+  assertThrows(
+    () => defineStore().add("a", () => {}).add("a", () => {}),
+    Error,
+    "Service already defined: a",
+  );
+  assertThrows(
+    () =>
+      defineStore()
+        .add("a", () => {})
+        .finalize()
+        .createChild()
+        .add("a", () => {}),
+    Error,
+    "Service already defined: a",
+  );
+});
+
 Deno.test("async", async () => {
   const store = defineStore()
     .add("A", () => {

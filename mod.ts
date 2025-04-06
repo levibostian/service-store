@@ -114,8 +114,8 @@ export class StoreDefinition<
     name: TName,
     value: (services: Store<TFactories>) => TType,
   ): StoreDefinition<TFactories & { [P in TName]: () => TType }> {
-    if (name in this.#factories) {
-      throw new Error(`Service ${name} already registered.`);
+    if (name in this.#factories || this.#parentStore?.has(name as never)) {
+      throw new Error(`Service already defined: ${name}`);
     }
     return new StoreDefinition({
       ...this.#factories,
