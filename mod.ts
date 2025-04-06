@@ -1,3 +1,4 @@
+/** A store which contains memoized instances. */
 export class Store<
   TFactories extends Record<string, (store: Store<TFactories>) => unknown>,
 > implements Disposable, AsyncDisposable {
@@ -19,6 +20,12 @@ export class Store<
     this.#parent = parent;
   }
 
+  /**
+   * Synchronously disposes all disposable services in the store.
+   * 
+   * @remarks This will error if any async disposable services are
+   * in the store (unless they're also disposable).
+   */
   [Symbol.dispose]() {
     for (const { value } of (Object.values(this.#memoizedValues) as any[])) {
       if (value[Symbol.dispose] instanceof Function) {
@@ -31,6 +38,10 @@ export class Store<
     }
   }
 
+  /**
+   * Asynchronously disposes all disposable and async disposable services
+   * in the store.
+   */
   async [Symbol.asyncDispose]() {
     const pendingPromises = [];
     for (const { value } of (Object.values(this.#memoizedValues) as any[])) {
@@ -44,11 +55,17 @@ export class Store<
     await Promise.all(pendingPromises);
   }
 
+  /** Gets if the store has a service with the provided name. */
   has<TName extends keyof TFactories>(name: TName): boolean {
     return name in this.#factories ||
       (this.#parent?.has(name as any as never) ?? false);
   }
 
+  /**
+   * Gets a service at the provided key.
+   * 
+   * @remarks Throws if the service is not in the store.
+   */
   get<TName extends keyof TFactories>(
     name: TName,
   ): ReturnType<TFactories[TName]> {
@@ -90,11 +107,27 @@ export class Store<
     }
   }
 
+  /**
+   * Creates a child store definition from the current store.
+   *
+   * This is useful for sharing instances in the current store
+   * with a child store definition which can then have multiple
+   * stores created from it.
+   * 
+   * For example, say you're creating an http server. It can be
+   * useful to have certain services alive for the duration of
+   * the application and only certain services alive per request.
+   * To achieve this, an application store can be made and from
+   * that a child "request store definition" with its request-only
+   * services. When a request comes in, a store can be created
+   * specifically for that request.
+   */
   createChild(): StoreDefinition<TFactories> {
     return new StoreDefinition({} as any, this);
   }
 }
 
+/** A definition of factory functions which can be used to create a store. */
 export class StoreDefinition<
   TFactories extends Record<string, (store: Store<TFactories>) => unknown>,
 > {
@@ -110,6 +143,7 @@ export class StoreDefinition<
     this.#parentStore = parentStore;
   }
 
+  /** Adds a service factory to the store definition at the provided key. */
   add<TName extends string, TType>(
     name: TName,
     value: (services: Store<TFactories>) => TType,
@@ -123,6 +157,11 @@ export class StoreDefinition<
     }, this.#parentStore) as any;
   }
 
+  /**
+   * Adds a transient service to the store. These services will
+   * be created each time they're requested instead of being
+   * memoized.
+   */
   addTransient<TName extends string, TType>(
     name: TName,
     value: (services: Store<TFactories>) => TType,
@@ -131,11 +170,24 @@ export class StoreDefinition<
     return this.add(name, value);
   }
 
+  /** Create the store. */
   finalize(): Store<TFactories> {
     return new Store(this.#factories, this.#parentStore);
   }
 }
 
+/**
+ * Start for defining a store definition and eventually
+ * creating a store.
+ * 
+ * ```ts
+ * const storeDef = defineStore()
+ *   .add("db", () => createDb())
+ *   .add("userService", (store) => new UserService(store.get("db")));
+ * const store = storeDef.finalize();
+ * const userService = store.get("userService");
+ * ```
+ */
 export function defineStore(): StoreDefinition<{}> {
   return new StoreDefinition({}, undefined);
 }
