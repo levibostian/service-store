@@ -1,19 +1,15 @@
 # `@david/service-store`
 
+[![JSR](https://jsr.io/badges/@david/service-store)](https://jsr.io/@david/service-store)
+
 Lightweight dependency injection.
 
 Goals:
 
-1. No magic, static analysis, `reflect-metadata`, build step, or decorators
+1. No magic, static analysis, `reflect-metadata`, build step, or decorators.
 1. Child stores.
 1. Type checking.
 1. Simple.
-
-Setup:
-
-```
-deno add jsr:@david/service-store
-```
 
 ## Example
 
@@ -35,7 +31,8 @@ const singletonStore = defineStore()
 const requestScopedDef = singletonStore
   .createChild()
   .add("db", async (store) => {
-    // grab an instance from the pool
+    // grab an instance from the pool to be used for
+    // the duration of the request
     const pool = await store.get("dbPool");
     return pool.getItem();
   })

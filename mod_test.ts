@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertRejects, assertThrows } from "@std/assert";
-import { defineStore, StoreDefinition } from "./mod.ts";
+import { defineStore, type Store, StoreDefinition } from "./mod.ts";
 
 Deno.test("StoreBuilder ctor", () => {
   assertThrows(
@@ -38,7 +38,8 @@ Deno.test("adding", () => {
 Deno.test("key not in store", () => {
   const store = defineStore().finalize();
   assertThrows(
-    () => store.get("something" as never),
+    // @ts-expect-error "something" is not in the store
+    () => store.get("something"),
     Error,
     "Store did not contain key: something",
   );
@@ -239,4 +240,25 @@ Deno.test("error", async () => {
 
   // will succeed after failing
   assertEquals(await store.get("a"), 1);
+});
+
+Deno.test("store can be typed easily", () => {
+  interface Services {
+    a: { value: 1 };
+    b: { value: 2 };
+  }
+
+  function getDefinition(): StoreDefinition<Services> {
+    return defineStore()
+      .add("a", () => ({ value: 1 } as const))
+      .add("b", () => ({ value: 2 } as const));
+  }
+
+  function getStore(): Store<Services> {
+    return getDefinition().finalize();
+  }
+
+  const store = getStore();
+  assertEquals(store.get("a").value, 1);
+  assertEquals(store.get("b").value, 2);
 });

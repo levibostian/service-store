@@ -1,20 +1,23 @@
 /** A store which contains memoized instances. */
-export class Store<
-  TFactories extends Record<string, (store: Store<TFactories>) => unknown>,
-> implements Disposable, AsyncDisposable {
+export class Store<TServices extends object>
+  implements Disposable, AsyncDisposable {
   readonly #memoizedValues: {
-    [P in keyof TFactories]?: {
+    [P in keyof TServices]?: {
       promisify?: true;
-      value: ReturnType<TFactories[P]>;
+      value: TServices[P];
     };
   } = {};
-  readonly #factories: TFactories;
-  readonly #parent?: Store<{}>;
+  readonly #factories: {
+    [K in keyof TServices]: (store: Store<TServices>) => TServices[K];
+  };
+  readonly #parent?: Store<object>;
 
   /** @ignore */
   constructor(
-    factories: TFactories,
-    parent: Store<{}> | undefined,
+    factories: {
+      [K in keyof TServices]: (store: Store<TServices>) => TServices[K];
+    },
+    parent: Store<object> | undefined,
   ) {
     this.#factories = factories;
     this.#parent = parent;
@@ -22,7 +25,7 @@ export class Store<
 
   /**
    * Synchronously disposes all disposable services in the store.
-   * 
+   *
    * @remarks This will error if any async disposable services are
    * in the store (unless they're also disposable).
    */
@@ -56,19 +59,19 @@ export class Store<
   }
 
   /** Gets if the store has a service with the provided name. */
-  has<TName extends keyof TFactories>(name: TName): boolean {
+  has<TName extends keyof TServices>(name: TName): boolean {
     return name in this.#factories ||
       (this.#parent?.has(name as any as never) ?? false);
   }
 
   /**
    * Gets a service at the provided key.
-   * 
+   *
    * @remarks Throws if the service is not in the store.
    */
-  get<TName extends keyof TFactories>(
+  get<TName extends keyof TServices>(
     name: TName,
-  ): ReturnType<TFactories[TName]> {
+  ): TServices[TName] {
     if (name in this.#memoizedValues) {
       const entry = this.#memoizedValues[name]!;
       if (entry.promisify) {
@@ -113,7 +116,7 @@ export class Store<
    * This is useful for sharing instances in the current store
    * with a child store definition which can then have multiple
    * stores created from it.
-   * 
+   *
    * For example, say you're creating an http server. It can be
    * useful to have certain services alive for the duration of
    * the application and only certain services alive per request.
@@ -122,20 +125,25 @@ export class Store<
    * services. When a request comes in, a store can be created
    * specifically for that request.
    */
-  createChild(): StoreDefinition<TFactories> {
-    return new StoreDefinition({} as any, this);
+  createChild(): StoreDefinition<TServices> {
+    return new StoreDefinition({} as any, this as any);
   }
 }
 
 /** A definition of factory functions which can be used to create a store. */
-export class StoreDefinition<
-  TFactories extends Record<string, (store: Store<TFactories>) => unknown>,
-> {
-  readonly #factories: TFactories;
-  readonly #parentStore: Store<{}> | undefined;
+export class StoreDefinition<TServices extends object> {
+  readonly #factories: {
+    [K in keyof TServices]: (store: Store<TServices>) => TServices[K];
+  };
+  readonly #parentStore: Store<object> | undefined;
 
   /** @ignore */
-  constructor(factories: TFactories, parentStore: Store<{}> | undefined) {
+  constructor(
+    factories: {
+      [K in keyof TServices]: (store: Store<TServices>) => TServices[K];
+    },
+    parentStore: Store<object> | undefined,
+  ) {
     if (arguments.length !== 2) {
       throw new Error("Use the `defineStore` export instead.");
     }
@@ -146,15 +154,15 @@ export class StoreDefinition<
   /** Adds a service factory to the store definition at the provided key. */
   add<TName extends string, TType>(
     name: TName,
-    value: (services: Store<TFactories>) => TType,
-  ): StoreDefinition<TFactories & { [P in TName]: () => TType }> {
+    value: (services: Store<TServices>) => TType,
+  ): StoreDefinition<TServices & { [P in TName]: TType }> {
     if (name in this.#factories || this.#parentStore?.has(name as never)) {
       throw new Error(`Service already defined: ${name}`);
     }
     return new StoreDefinition({
       ...this.#factories,
       [name]: value,
-    }, this.#parentStore) as any;
+    } as any, this.#parentStore) as any;
   }
 
   /**
@@ -164,14 +172,14 @@ export class StoreDefinition<
    */
   addTransient<TName extends string, TType>(
     name: TName,
-    value: (services: Store<TFactories>) => TType,
-  ): StoreDefinition<TFactories & { [P in TName]: () => TType }> {
+    value: (services: Store<TServices>) => TType,
+  ): StoreDefinition<TServices & { [P in TName]: TType }> {
     (value as any).transient = true;
     return this.add(name, value);
   }
 
   /** Create the store. */
-  finalize(): Store<TFactories> {
+  finalize(): Store<TServices> {
     return new Store(this.#factories, this.#parentStore);
   }
 }
@@ -179,7 +187,7 @@ export class StoreDefinition<
 /**
  * Start for defining a store definition and eventually
  * creating a store.
- * 
+ *
  * ```ts
  * const storeDef = defineStore()
  *   .add("db", () => createDb())
@@ -188,6 +196,6 @@ export class StoreDefinition<
  * const userService = store.get("userService");
  * ```
  */
-export function defineStore(): StoreDefinition<{}> {
+export function defineStore(): StoreDefinition<object> {
   return new StoreDefinition({}, undefined);
 }
