@@ -10,6 +10,8 @@ Goals:
 1. Child stores.
 1. Type checking.
 
+Services are created lazily and memoized.
+
 ## Example
 
 ```ts
